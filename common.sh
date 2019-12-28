@@ -22,92 +22,54 @@
 # General Functions
 # =============================================================================
 
-# Test username and password against GitHub's API
+# Gets the latest version number of a project on GitHub/GitLab
 # Params:
-#   - GitHub Login
+#   - GitHub/GitLab
+#   - Username
+#   - Project name
+#   - Include Prerelease (Only for GitHub)
 # Returns:
-#   Whether it worked or not.
-test_login () {
-    response=$(curl -u ${1} -H  "Accept: application/json" -H "Content-Type: application/json" -H "User-Agent: Kosmos/1.0.0" -s https://api.github.com/)
-    message_index=$(echo ${response} | jq 'keys | index("message")')
-    if [ "${message_index}" == "null" ]
+#   The latest version number.
+get_latest_release_version () {
+    file="/tmp/$(uuidgen)"
+    status=$(curl -G -H "User-Agent: Kosmos-Builder/2.0.0" -o ${file} -s -w "%{http_code}" https://kosmos-builder.teamatlasnx.com/${1}/${2}/${3}/version --data-urlencode "prerelease=${4}")
+    if [[ ${status} = "404" ]]
     then
-        echo "1"
+        echo "Not Found"
+    elif [[ ${status} != "200" ]]
+    then
+        echo "Error"
     else
-        echo "0"
+        response=$(cat ${file})
+        echo $response
     fi
+    rm -f "${file}"
 }
 
-# Downloads the latest release JSON.
+# Gets the latest release download URL of a project on GitHub/GitLab
 # Params:
-#   - GitHub Login
-#   - GitHub Company
-#   - GitHub Repo
-#   - Allow pre-release releases
+#   - GitHub/GitLab
+#   - Username
+#   - Project name
+#   - RegExp Pattern
+#   - Group Number (Only needed for GitLab)
+#   - Include Prerelease (Only for GitHub)
 # Returns:
-#   The latest release JSON.
-get_latest_release () {
-    jqQuery=".[0]"
-    if [ "${4}" == "0" ]
+#   The latest release download URL.
+get_latest_release_download_url () {
+    file="/tmp/$(uuidgen)"
+    status=$(curl -G -H "User-Agent: Kosmos-Builder/2.0.0" -o ${file} -s -w "%{http_code}" https://kosmos-builder.teamatlasnx.com/${1}/${2}/${3}/release --data-urlencode "pattern=${4}" --data-urlencode match="${5}"  --data-urlencode "prerelease=${6}")
+    if [[ ${status} = "404" ]]
     then
-        jqQuery="[.[] | select(.prerelease == false)][0]"
-    fi
-
-    if [ -z "${1}" ] 
+        echo "Not Found"
+    elif [[ ${status} != "200" ]]
     then
-        echo $(curl -H "Accept: application/json" -H "Content-Type: application/json" -H "User-Agent: Kosmos/1.0.0" -s https://api.github.com/repos/${2}/${3}/releases | jq -r "${jqQuery}")
+        echo "Error"
     else
-        echo $(curl -u ${1} -H "Accept: application/json" -H "Content-Type: application/json" -H "User-Agent: Kosmos/1.0.0" -s https://api.github.com/repos/${2}/${3}/releases | jq -r "${jqQuery}")
+        response=$(cat ${file})
+        echo $response
     fi
-}
-
-# Gets the number of assets in a release.
-# Params:
-#   - The release JSON
-# Returns:
-#   The number of assets.
-_get_number_of_assets () {
-    return $(echo ${1} | jq -r '.assets | length')
-}
-
-# Finds a specific asset in a release.
-# Params:
-#   - The release JSON
-#   - Start with blob pattern
-#   - Ends with blob pattern
-# Returns:
-#   The asset JSON.
-find_asset () {
-    _get_number_of_assets "${1}"
-    number_of_assets=${?}
-
-    for (( i=0; i<${number_of_assets}; i++ ))
-    do
-        name=$(echo ${1} | jq -r ".assets[${i}].name" | tr '[:upper:]' '[:lower:]')
-        asset=$(echo ${1} | jq -r ".assets[${i}]")
-
-        if [[ ${#} -eq 2 && ${name} == ${2} ]]
-        then
-            echo ${asset}
-            break
-        fi
-
-        if [[ ${#} -eq 3 && ${name} == ${2} && ${name} == ${3} ]]
-        then
-            echo ${asset}
-            break
-        fi
-    done
-}
-
-# Downloads a file.
-# Params:
-#   - The release asset JSON
-# Returns:
-#   The file path.
-download_file () {
-    url=$(echo ${1} | jq -r ".browser_download_url")
-    echo $(download_file_url "${url}")
+    rm -f "${file}"
 }
 
 # Downloads a file from URL.
@@ -115,19 +77,16 @@ download_file () {
 #   - URL
 # Returns:
 #   The file path.
-download_file_url () {
+get_file () {
     file="/tmp/$(uuidgen)"
-    curl -L -H "User-Agent: ${user_agent}" -s ${1} >> ${file}
-    echo ${file}
-}
-
-# Gets the version number from an asset.
-# Params:
-#   - The release asset JSON
-# Returns:
-#   The version number.
-get_version_number () {
-    echo $(echo ${1} | jq -r ".tag_name")
+    status=$(curl -L -H "User-Agent: Kosmos-Builder/2.0.0" -o ${file} -s -w "%{http_code}" ${1})
+    if [[ ${status} != "200" ]]
+    then
+        echo "Error"
+        rm -f "${file}"
+    else
+        echo ${file}
+    fi
 }
 
 # Find path matching a pattern
@@ -144,7 +103,7 @@ glob () {
 # Main Script
 # =============================================================================
 
-if [ $# -le 1 ]
+if [[ $# -le 1 ]]
 then
     echo "This is not meant to be called by end users and is used by the kosmos.sh and sdsetup.sh scripts."
     exit 1
