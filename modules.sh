@@ -21,110 +21,271 @@
 # Downloads the latest Atmosphere release and extracts it.
 # Params:
 #   - Directory to extract to
-#   - GitHub Login
 # Returns:
 #   The version number.
 download_atmosphere () {
-    mkdir -p ${1}
-    latest_release=$(./common.sh get_latest_release "${2}" "Atmosphere-NX" "Atmosphere" "1")
+    service="github"
+    user="Atmosphere-NX"
+    project="Atmosphere"
 
-    asset=$(./common.sh find_asset "${latest_release}" "atmosphere*" "*.zip")
-    file=$(./common.sh download_file "${asset}")
+    mkdir -p "${1}"
+    
+    # Get version number.
+    version=$(./common.sh get_latest_release_version "${service}" "${user}" "${project}")
+    if [[ $version = "Not Found" || $version = "Error" ]]
+    then
+        echo "[Error] Unable to get Atmosphere version number."
+        return
+    fi
 
-    unzip -qq "${file}" -d "${1}"
+    # Get release URLs.
+    atmosphere_url=$(./common.sh get_latest_release_download_url "${service}" "${user}" "${project}" ".*atmosphere-.*\.zip")
+    if [[ $atmosphere_url = "Not Found" || $atmosphere_url = "Error" ]]
+    then
+        echo "[Error] Unable to get release URL for Atmosphere."
+        return
+    fi
+
+    fusee_url=$(./common.sh get_latest_release_download_url "${service}" "${user}" "${project}" ".*fusee-primary.bin")
+    if [[ $fusee_url = "Not Found" || $fusee_url = "Error" ]]
+    then
+        echo "[Error] Unable to get release URL for Fusee Primary."
+        return
+    fi
+
+    # Download the releases.
+    atmosphere=$(./common.sh get_file "${atmosphere_url}")
+    if [[ $atmosphere = "Error" ]]
+    then
+        echo "[Error] Unable to download Atmosphere."
+        return
+    fi
+
+    fusee=$(./common.sh get_file "${fusee_url}")
+    if [[ $fusee = "Error" ]]
+    then
+        echo "[Error] Unable to download Fusee Primary."
+        return
+    fi
+
+    # Assemble everything
+    unzip -qq -o "${atmosphere}" -d "${1}"
+    rm -f "${atmosphere}"
     rm -f "${1}/switch/reboot_to_payload.nro"
     rm -f "${1}/atmosphere/reboot_payload.bin"
-    rm -f "${file}"
-
-    asset=$(./common.sh find_asset "${latest_release}" "fusee*" "*.bin")
-    file=$(./common.sh download_file "${asset}")
-
     mkdir -p "${1}/bootloader/payloads"
-    mv ${file} "${1}/bootloader/payloads/fusee-primary.bin"
+    mv "${fusee}" "${1}/bootloader/payloads/fusee-primary.bin"
     cp "./Modules/atmosphere/system_settings.ini" "${1}/atmosphere/config/system_settings.ini"
 
-    echo $(./common.sh get_version_number "${latest_release}")
+    # Return the version number
+    echo "${version}"
 }
 
 # Downloads the latest Hekate release and extracts it.
 # Params:
 #   - Directory to extract to
 #   - The Kosmos version number
-#   - GitHub Login
 # Returns:
 #   The version number.
 download_hekate () {
-    mkdir -p ${1}
-    latest_release=$(./common.sh get_latest_release "${3}" "CTCaer" "hekate" "1")
+    service="github"
+    user="CTCaer"
+    project="hekate"
 
-    asset=$(./common.sh find_asset "${latest_release}" "hekate*" "*.zip")
-    file=$(./common.sh download_file "${asset}")
-
-    unzip -qq "${file}" -d "${1}"
-    rm -f "${file}"
-
-    payload=$(./common.sh glob "${1}/hekate*.bin")
-    cp "${payload}" "${1}/bootloader/update.bin"
-    mkdir -p "${1}/atmosphere"
-    cp "${payload}" "${1}/atmosphere/reboot_payload.bin"
-
-    cp "./Modules/hekate/bootlogo.bmp" "${1}/bootloader/bootlogo.bmp"
+    mkdir -p "${1}"
     
-    sed "s/KOSMOS_VERSION/${2}/g" "./Modules/hekate/hekate_ipl.ini" >> "${1}/bootloader/hekate_ipl.ini"
-
-    echo $(./common.sh get_version_number "${latest_release}")
-}
-
-download_appstore () {
-    mkdir -p ${1}
-    latest_release=$(./common.sh get_latest_release "${2}" "vgmoose" "hb-appstore" "1")
-
-    asset=$(./common.sh find_asset "${latest_release}" "*.nro")
-    file=$(./common.sh download_file "${asset}")
-
-    mkdir -p "${1}/switch/appstore"
-    mv ${file} "${1}/switch/appstore/appstore.nro"
-
-    echo $(./common.sh get_version_number "${latest_release}")
-}
-
-download_edizon () {
-    mkdir -p ${1}
-    latest_release=$(./common.sh get_latest_release "${2}" "WerWolv" "EdiZon" "0")
-
-    asset=$(./common.sh find_asset "${latest_release}" "*.zip")
-    if [ ! -z "${asset}" ]
+    # Get version number.
+    version=$(./common.sh get_latest_release_version "${service}" "${user}" "${project}")
+    if [[ $version = "Not Found" || $version = "Error" ]]
     then
-        file=$(./common.sh download_file "${asset}")
-
-        unzip -qq "${file}" -d "${1}"
-        rm -f "${file}"
-    else
-        asset=$(./common.sh find_asset "${latest_release}" "*.nro")
-        file=$(./common.sh download_file "${asset}")
-
-        mkdir -p "${1}/switch/EdiZon"
-        mv "${file}" "${1}/switch/EdiZon/EdiZon.nro"
+        echo "[Error] Unable to get Hekate version number."
+        return
     fi
 
-    echo $(./common.sh get_version_number "${latest_release}")
+    # Get release URLs.
+    hekate_url=$(./common.sh get_latest_release_download_url "${service}" "${user}" "${project}" ".*hekate_ctcaer_.*\.zip")
+    if [[ $hekate_url = "Not Found" || $hekate_url = "Error" ]]
+    then
+        echo "[Error] Unable to get release URL for Hekate."
+        return
+    fi
+
+    # Download the releases.
+    hekate=$(./common.sh get_file "${hekate_url}")
+    if [[ $hekate = "Error" ]]
+    then
+        echo "[Error] Unable to download Hekate."
+        return
+    fi
+
+    # Assemble everything
+    unzip -qq -o "${hekate}" -d "${1}"
+    rm -f "${hekate}"
+    payload=$(./common.sh glob "${1}/hekate_ctcaer_*.bin")
+    cp "${payload}" "${1}/bootloader/update.bin"
+    cp "./Modules/hekate/bootlogo.bmp" "${1}/bootloader/bootlogo.bmp"
+    cp "${payload}" "${1}/atmosphere/reboot_payload.bin"
+    sed "s/KOSMOS_VERSION/${2}/g" "./Modules/hekate/hekate_ipl.ini" >> "${1}/bootloader/hekate_ipl.ini"
+
+    # Return the version number
+    echo "${version}"
 }
 
-download_emuiibo () {
+# Downloads the latest App Store release and extracts it.
+# Params:
+#   - Directory to extract to
+# Returns:
+#   The version number.
+download_appstore () {
+    service="gitlab"
+    user="4TU"
+    project="hb-appstore"
+
+    mkdir -p "${1}"
+
+    # Get version number.
+    version=$(./common.sh get_latest_release_version "${service}" "${user}" "${project}")
+    if [[ $version = "Not Found" || $version = "Error" ]]
+    then
+        echo "[Error] Unable to get App Store version number."
+        return
+    fi
+
+    # Get release URLs.
+    appstore_url=$(./common.sh get_latest_release_download_url "${service}" "${user}" "${project}" "\((.*\.nro\.zip)\)" "1")
+    if [[ $appstore_url = "Not Found" || $appstore_url = "Error" ]]
+    then
+        echo "[Error] Unable to get release URL for App Store."
+        return
+    fi
+
+    # Download the releases.
+    appstore=$(./common.sh get_file "https://gitlab.com/${user}/${project}${appstore_url}")
+    if [[ $appstore = "Error" ]]
+    then
+        echo "[Error] Unable to download App Store."
+        return
+    fi
+
+    # Assemble everything
+    mkdir -p "${1}/switch/appstore"
+    unzip -qq -o "${appstore}" -d "${1}/switch/appstore"
+    rm -f "${appstore}"
+
+    # Return the version number
+    echo "${version}"
+}
+
+# Downloads the latest Edizon release and extracts it.
+# Params:
+#   - Directory to extract to
+# Returns:
+#   The version number.
+download_edizon () {
+    service="github"
+    user="WerWolv"
+    project="EdiZon"
+
     mkdir -p ${1}
-    latest_release=$(./common.sh get_latest_release "${2}" "XorTroll" "emuiibo" "1")
 
-    asset=$(./common.sh find_asset "${latest_release}" "emuiibo*" "*.zip")
-    file=$(./common.sh download_file "${asset}")
+    # Get version number.
+    version=$(./common.sh get_latest_release_version "${service}" "${user}" "${project}" "true")
+    if [ $version = "Not Found" ] || [ $version = "Error" ]
+    then
+        echo "[Error] Unable to get Edizon version number."
+        return
+    fi
 
-    unzip -qq "${file}" -d "${1}"
+    # Get release URLs.
+    edizon_url=$(./common.sh get_latest_release_download_url "${service}" "${user}" "${project}" ".*SD.zip" "0" "true")
+    if [[ $edizon_url = "Error" ]]
+    then
+        echo "[Error] Unable to get release URL for Edizon."
+        return
+    elif [[ $edizon_url = "Not Found" ]]
+    then
+        edizon_url=$(./common.sh get_latest_release_download_url "${service}" "${user}" "${project}" ".*EdiZon.nro" "0" "true")
+        if [[ $edizon_url = "Not Found" || $edizon_url = "Error" ]]
+        then
+            echo "[Error] Unable to get release URL for Edizon."
+            return
+        fi
+
+        # Download the releases.
+        edizon=$(./common.sh get_file "${edizon_url}")
+        if [[ $edizon = "Error" ]]
+        then
+            echo "[Error] Unable to download Edizon."
+            return
+        fi
+
+        # Assemble everything
+        mkdir -p "${1}/switch/EdiZon"
+        mv "${edizon}" "${1}/switch/EdiZon/EdiZon.nro"
+    else
+        # Download the releases.
+        edizon=$(./common.sh get_file "${edizon_url}")
+        if [[ $edizon = "Error" ]]
+        then
+            echo "[Error] Unable to download Edizon."
+            return
+        fi
+
+        # Assemble everything
+        unzip -qq -o "${edizon}" -d "${1}"
+        rm -f "${edizon}"
+    fi
+
+    # Return the version number
+    echo "${version}"
+}
+
+# Downloads the latest Emuiibo release and extracts it.
+# Params:
+#   - Directory to extract to
+# Returns:
+#   The version number.
+download_emuiibo () {
+    service="github"
+    user="XorTroll"
+    project="emuiibo"
+
+    mkdir -p ${1}
+
+    # Get version number.
+    version=$(./common.sh get_latest_release_version "${service}" "${user}" "${project}" "true")
+    if [[ $version = "Not Found" || $version = "Error" ]]
+    then
+        echo "[Error] Unable to get Emuiibo version number."
+        return
+    fi
+
+    # Get release URLs.
+    emuiibo_url=$(./common.sh get_latest_release_download_url "${service}" "${user}" "${project}" ".*emuiibo.zip" "0" "true")
+    if [[ $emuiibo_url = "Not Found" || $emuiibo_url = "Error" ]]
+    then
+        echo "[Error] Unable to get release URL for Emuiibo."
+        return
+    fi
+
+    # Download the releases.
+    emuiibo=$(./common.sh get_file "${emuiibo_url}")
+    if [[ $emuiibo = "Error" ]]
+    then
+        echo "[Error] Unable to download Emuiibo."
+        return
+    fi
+
+    # Assemble everything
+    unzip -qq -o "${emuiibo}" -d "${1}"
+    rm -f "${emuiibo}"
     rm -f "${1}/titles/0100000000000352/flags/boot2.flag"
-    rm -f "${file}"
     mkdir -p "${1}/atmosphere/contents"
     mv "${1}/titles/0100000000000352" "${1}/atmosphere/contents/"
     rm -rf "${1}/titles"
 
-    echo $(./common.sh get_version_number "${latest_release}")
+    # Return the version number
+    echo "${version}"
 }
 
 download_goldleaf () {
@@ -274,7 +435,7 @@ remove_configs () {
 # Main Script
 # =============================================================================
 
-if [ $# -le 1 ]
+if [[ $# -le 1 ]]
 then
     echo "This is not meant to be called by end users and is used by the kosmos.sh and sdsetup.sh scripts."
     exit 1
