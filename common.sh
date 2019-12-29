@@ -33,6 +33,7 @@
 get_latest_release_version () {
     file="/tmp/$(uuidgen)"
     status=$(curl -G -H "User-Agent: Kosmos-Builder/2.0.0" -o ${file} -s -w "%{http_code}" https://kosmos-builder.teamatlasnx.com/${1}/${2}/${3}/version --data-urlencode "prerelease=${4}")
+
     if [[ ${status} = "404" ]]
     then
         echo "Not Found"
@@ -41,8 +42,9 @@ get_latest_release_version () {
         echo "Error"
     else
         response=$(cat ${file})
-        echo $response
+        echo "${response}"
     fi
+    
     rm -f "${file}"
 }
 
@@ -59,6 +61,7 @@ get_latest_release_version () {
 get_latest_release_download_url () {
     file="/tmp/$(uuidgen)"
     status=$(curl -G -H "User-Agent: Kosmos-Builder/2.0.0" -o ${file} -s -w "%{http_code}" https://kosmos-builder.teamatlasnx.com/${1}/${2}/${3}/release --data-urlencode "pattern=${4}" --data-urlencode match="${5}"  --data-urlencode "prerelease=${6}")
+
     if [[ ${status} = "404" ]]
     then
         echo "Not Found"
@@ -69,6 +72,7 @@ get_latest_release_download_url () {
         response=$(cat ${file})
         echo $response
     fi
+
     rm -f "${file}"
 }
 
@@ -80,6 +84,7 @@ get_latest_release_download_url () {
 get_file () {
     file="/tmp/$(uuidgen)"
     status=$(curl -L -H "User-Agent: Kosmos-Builder/2.0.0" -o ${file} -s -w "%{http_code}" ${1})
+    
     if [[ ${status} != "200" ]]
     then
         echo "Error"
